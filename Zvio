@@ -1,89 +1,56 @@
--- Simple Auto Clicker with GTK GUI
-local lgi = require 'lgi'
-local Gtk = lgi.require('Gtk', '3.0')
-local GLib = lgi.require('GLib', '2.0')
+-- Simple Windows Auto Clicker
+local ffi = require("ffi")
 
--- Initialize GTK
-Gtk.init()
+ffi.cdef[[
+    void Sleep(int ms);
+    bool GetAsyncKeyState(int vKey);
+    void mouse_event(int dwFlags, int dx, int dy, int dwData, int dwExtraInfo);
+]]
 
--- Create window
-local window = Gtk.Window {
-    title = "Auto Clicker",
-    default_width = 200,
-    default_height = 150
-}
-
--- Create a vertical box to hold widgets
-local box = Gtk.Box {
-    orientation = Gtk.Orientation.VERTICAL,
-    spacing = 10
-}
-window:add(box)
-
--- Create widgets
-local startButton = Gtk.Button { label = "Start (F5)" }
-local statusLabel = Gtk.Label { label = "Status: Stopped" }
-local clicksLabel = Gtk.Label { label = "Clicks: 0" }
-
--- Add widgets to box
-box:pack_start(startButton, true, true, 0)
-box:pack_start(statusLabel, true, true, 0)
-box:pack_start(clicksLabel, true, true, 0)
-
--- Variables
-local running = false
-local clicks = 0
+-- Constants
+local MOUSEEVENTF_LEFTDOWN = 0x0002
+local MOUSEEVENTF_LEFTUP = 0x0004
+local VK_F6 = 0x75  -- F6 key
+local VK_F8 = 0x77  -- F8 key
 
 -- Function to simulate mouse click
 local function click()
-    os.execute("xdotool click 1")  -- For Linux
-    -- For Windows, you would use a different command
-    clicks = clicks + 1
-    clicksLabel.label = "Clicks: " .. clicks
+    ffi.C.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+    ffi.C.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
 end
 
--- Timer function for auto clicking
-local function autoClick()
-    if running then
+print("Auto Clicker Started!")
+print("Press F6 to start/stop clicking")
+print("Press F8 to exit")
+
+local clicking = false
+local clicks = 0
+
+while true do
+    -- Check if F6 is pressed to toggle clicking
+    if ffi.C.GetAsyncKeyState(VK_F6) ~= 0 then
+        clicking = not clicking
+        if clicking then
+            print("Clicking started!")
+        else
+            print("Clicking stopped! Total clicks: " .. clicks)
+        end
+        ffi.C.Sleep(200)  -- Delay to prevent multiple toggles
+    end
+    
+    -- Check if F8 is pressed to exit
+    if ffi.C.GetAsyncKeyState(VK_F8) ~= 0 then
+        print("Exiting... Total clicks: " .. clicks)
+        break
+    end
+    
+    -- If clicking is enabled, perform click
+    if clicking then
         click()
-        return true -- Continue timer
-    end
-    return false -- Stop timer
-end
-
--- Button click handler
-function startButton:on_clicked()
-    running = not running
-    if running then
-        startButton.label = "Stop (F6)"
-        statusLabel.label = "Status: Running"
-        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1, autoClick) -- 1ms delay
+        clicks = clicks + 1
+        -- Very small delay to prevent system overload
+        ffi.C.Sleep(1)
     else
-        startButton.label = "Start (F5)"
-        statusLabel.label = "Status: Stopped"
+        ffi.C.Sleep(10)  -- Reduce CPU usage when not clicking
     end
 end
-
--- Key press handler
-window:connect('key-press-event', function(_, event)
-    local key = event.keyval
-    if key == Gtk.keysyms.F5 then
-        running = true
-        startButton:clicked()
-    elseif key == Gtk.keysyms.F6 then
-        running = false
-        startButton:clicked()
-    elseif key == Gtk.keysyms.Escape then
-        Gtk.main_quit()
-    end
-    return false
-end)
-
--- Quit handler
-function window:on_destroy()
-    Gtk.main_quit()
-end
-
--- Show window and start main loop
-window:show_all()
-Gtk.main()
