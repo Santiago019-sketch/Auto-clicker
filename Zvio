@@ -1,56 +1,59 @@
--- Simple Windows Auto Clicker
-local ffi = require("ffi")
-
-ffi.cdef[[
-    void Sleep(int ms);
-    bool GetAsyncKeyState(int vKey);
-    void mouse_event(int dwFlags, int dx, int dy, int dwData, int dwExtraInfo);
+local autoclicker = [[
+    local mouse = {}
+    local keys = {}
+    
+    -- Simulate Windows API functions
+    local ffi = require("ffi")
+    ffi.cdef[[
+        void Sleep(int ms);
+        bool GetAsyncKeyState(int vKey);
+        void mouse_event(int dwFlags, int dx, int dy, int dwData, int dwExtraInfo);
+    ]]
+    
+    -- Mouse click constants
+    local MOUSEEVENTF_LEFTDOWN = 0x0002
+    local MOUSEEVENTF_LEFTUP = 0x0004
+    local VK_F6 = 0x75  -- F6 key
+    local VK_ESCAPE = 0x1B  -- ESC key
+    
+    -- Click function
+    local function click()
+        ffi.C.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        ffi.C.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+    end
+    
+    -- Main loop
+    print("Auto Clicker Running!")
+    print("Press F6 to toggle clicking")
+    print("Press ESC to exit")
+    
+    local clicking = false
+    local count = 0
+    
+    while true do
+        if ffi.C.GetAsyncKeyState(VK_F6) ~= 0 then
+            clicking = not clicking
+            if clicking then
+                print("Clicking started!")
+            else
+                print("Stopped! Clicks: " .. count)
+            end
+            ffi.C.Sleep(200)
+        end
+        
+        if ffi.C.GetAsyncKeyState(VK_ESCAPE) ~= 0 then
+            print("Exiting! Total clicks: " .. count)
+            break
+        end
+        
+        if clicking then
+            click()
+            count = count + 1
+            ffi.C.Sleep(1) -- Minimal delay
+        else
+            ffi.C.Sleep(10)
+        end
+    end
 ]]
 
--- Constants
-local MOUSEEVENTF_LEFTDOWN = 0x0002
-local MOUSEEVENTF_LEFTUP = 0x0004
-local VK_F6 = 0x75  -- F6 key
-local VK_F8 = 0x77  -- F8 key
-
--- Function to simulate mouse click
-local function click()
-    ffi.C.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-    ffi.C.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-end
-
-print("Auto Clicker Started!")
-print("Press F6 to start/stop clicking")
-print("Press F8 to exit")
-
-local clicking = false
-local clicks = 0
-
-while true do
-    -- Check if F6 is pressed to toggle clicking
-    if ffi.C.GetAsyncKeyState(VK_F6) ~= 0 then
-        clicking = not clicking
-        if clicking then
-            print("Clicking started!")
-        else
-            print("Clicking stopped! Total clicks: " .. clicks)
-        end
-        ffi.C.Sleep(200)  -- Delay to prevent multiple toggles
-    end
-    
-    -- Check if F8 is pressed to exit
-    if ffi.C.GetAsyncKeyState(VK_F8) ~= 0 then
-        print("Exiting... Total clicks: " .. clicks)
-        break
-    end
-    
-    -- If clicking is enabled, perform click
-    if clicking then
-        click()
-        clicks = clicks + 1
-        -- Very small delay to prevent system overload
-        ffi.C.Sleep(1)
-    else
-        ffi.C.Sleep(10)  -- Reduce CPU usage when not clicking
-    end
-end
+return autoclicker
