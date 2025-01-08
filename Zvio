@@ -1,147 +1,89 @@
--- Auto Clicker with GUI using LÖVE framework
-local love = require("love")
+-- Simple Auto Clicker with GTK GUI
+local lgi = require 'lgi'
+local Gtk = lgi.require('Gtk', '3.0')
+local GLib = lgi.require('GLib', '2.0')
 
--- Initialize variables
-local running = false
-local clickCount = 0
-local clickDelay = 0.001 -- Delay between clicks in seconds
-local lastClickTime = 0
+-- Initialize GTK
+Gtk.init()
 
--- Button dimensions
-local buttonWidth = 200
-local buttonHeight = 60
-
--- Colors
-local colors = {
-    background = {0.2, 0.2, 0.2},
-    button = {0.3, 0.7, 0.3},
-    buttonHover = {0.4, 0.8, 0.4},
-    buttonStop = {0.7, 0.3, 0.3},
-    text = {1, 1, 1}
+-- Create window
+local window = Gtk.Window {
+    title = "Auto Clicker",
+    default_width = 200,
+    default_height = 150
 }
 
--- Initialize LÖVE
-function love.load()
-    -- Set window properties
-    love.window.setMode(300, 200)
-    love.window.setTitle("Auto Clicker")
-    
-    -- Calculate button position
-    buttonX = (love.graphics.getWidth() - buttonWidth) / 2
-    buttonY = (love.graphics.getHeight() - buttonHeight) / 2
+-- Create a vertical box to hold widgets
+local box = Gtk.Box {
+    orientation = Gtk.Orientation.VERTICAL,
+    spacing = 10
+}
+window:add(box)
+
+-- Create widgets
+local startButton = Gtk.Button { label = "Start (F5)" }
+local statusLabel = Gtk.Label { label = "Status: Stopped" }
+local clicksLabel = Gtk.Label { label = "Clicks: 0" }
+
+-- Add widgets to box
+box:pack_start(startButton, true, true, 0)
+box:pack_start(statusLabel, true, true, 0)
+box:pack_start(clicksLabel, true, true, 0)
+
+-- Variables
+local running = false
+local clicks = 0
+
+-- Function to simulate mouse click
+local function click()
+    os.execute("xdotool click 1")  -- For Linux
+    -- For Windows, you would use a different command
+    clicks = clicks + 1
+    clicksLabel.label = "Clicks: " .. clicks
 end
 
--- Update function
-function love.update(dt)
+-- Timer function for auto clicking
+local function autoClick()
     if running then
-        local currentTime = love.timer.getTime()
-        if currentTime - lastClickTime >= clickDelay then
-            -- Simulate mouse click
-            love.mouse.isDown(1)
-            clickCount = clickCount + 1
-            lastClickTime = currentTime
-        end
+        click()
+        return true -- Continue timer
     end
+    return false -- Stop timer
 end
 
--- Draw function
-function love.draw()
-    -- Draw background
-    love.graphics.setBackgroundColor(colors.background)
-    
-    -- Draw button
+-- Button click handler
+function startButton:on_clicked()
+    running = not running
     if running then
-        love.graphics.setColor(colors.buttonStop)
+        startButton.label = "Stop (F6)"
+        statusLabel.label = "Status: Running"
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1, autoClick) -- 1ms delay
     else
-        love.graphics.setColor(colors.button)
-    end
-    
-    -- Draw main button
-    love.graphics.rectangle(
-        "fill",
-        buttonX,
-        buttonY,
-        buttonWidth,
-        buttonHeight,
-        10 -- rounded corners
-    )
-    
-    -- Draw button text
-    love.graphics.setColor(colors.text)
-    local buttonText = running and "Stop (F6)" or "Start (F5)"
-    local textWidth = love.graphics.getFont():getWidth(buttonText)
-    local textHeight = love.graphics.getFont():getHeight()
-    
-    love.graphics.print(
-        buttonText,
-        buttonX + (buttonWidth - textWidth) / 2,
-        buttonY + (buttonHeight - textHeight) / 2
-    )
-    
-    -- Draw click counter
-    love.graphics.print(
-        "Clicks: " .. clickCount,
-        10,
-        10
-    )
-    
-    -- Draw CPS (Clicks Per Second) indicator
-    love.graphics.print(
-        "Speed: " .. string.format("%.1f", 1/clickDelay) .. " CPS",
-        10,
-        30
-    )
-end
-
--- Mouse click handler
-function love.mousepressed(x, y, button)
-    if button == 1 then
-        -- Check if click is within button bounds
-        if x >= buttonX and x <= buttonX + buttonWidth and
-           y >= buttonY and y <= buttonY + buttonHeight then
-            running = not running
-            if running then
-                lastClickTime = love.timer.getTime()
-            end
-        end
+        startButton.label = "Start (F5)"
+        statusLabel.label = "Status: Stopped"
     end
 end
 
--- Keyboard handler
-function love.keypressed(key)
-    if key == "f5" then
+-- Key press handler
+window:connect('key-press-event', function(_, event)
+    local key = event.keyval
+    if key == Gtk.keysyms.F5 then
         running = true
-        lastClickTime = love.timer.getTime()
-    elseif key == "f6" then
+        startButton:clicked()
+    elseif key == Gtk.keysyms.F6 then
         running = false
-    elseif key == "escape" then
-        love.event.quit()
+        startButton:clicked()
+    elseif key == Gtk.keysyms.Escape then
+        Gtk.main_quit()
     end
+    return false
+end)
+
+-- Quit handler
+function window:on_destroy()
+    Gtk.main_quit()
 end
 
--- Run the program
-function love.run()
-    if love.load then love.load() end
-
-    return function()
-        -- Process events
-        love.event.pump()
-        for name, a,b,c,d,e,f in love.event.poll() do
-            if name == "quit" then
-                return 0
-            end
-            love.handlers[name](a,b,c,d,e,f)
-        end
-
-        -- Update
-        if love.update then love.update() end
-
-        -- Draw
-        if love.graphics.isActive() then
-            love.graphics.origin()
-            love.graphics.clear(love.graphics.getBackgroundColor())
-            if love.draw then love.draw() end
-            love.graphics.present()
-        end
-    end
-end
+-- Show window and start main loop
+window:show_all()
+Gtk.main()
